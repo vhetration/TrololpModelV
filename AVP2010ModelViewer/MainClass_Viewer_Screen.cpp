@@ -11,6 +11,12 @@
 #include "Drawable_info.h"
 #include "ViewFrustrum.h"
 
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
+
 #pragma comment(lib, "d3d11.lib")
 
 using namespace DirectX;
@@ -144,28 +150,31 @@ int g_framecount = 0;
 
 HRESULT CompileShaderFromFile(const WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, ID3DBlob** ppBlobOut)
 {
-	HRESULT hr = S_OK;
+	std::ifstream ifs;
+	ifs.open(szFileName, std::ifstream::in);
+	if (!ifs.is_open()) {
+		return E_FAIL; // Or an appropriate error code
+	}
+
+	std::string shaderCode((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+	ifs.close();
 
 	DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #ifdef _DEBUG
-	// Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-	// Setting this flag improves the shader debugging experience, but still allows 
-	// the shaders to be optimized and to run exactly the way they will run in 
-	// the release configuration of this program.
 	dwShaderFlags |= D3DCOMPILE_DEBUG;
-
-	// Disable optimizations to further improve shader debugging
 	dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 
 	ID3DBlob* pErrorBlob = nullptr;
-	hr = D3DCompileFromFile(szFileName, nullptr, nullptr, szEntryPoint, szShaderModel,
-		dwShaderFlags, 0, ppBlobOut, &pErrorBlob);
+	HRESULT hr = D3DCompile(shaderCode.c_str(), shaderCode.size(), NULL, nullptr, nullptr,
+		szEntryPoint, szShaderModel, dwShaderFlags, 0, ppBlobOut, &pErrorBlob);
+
 	if (FAILED(hr))
 	{
 		if (pErrorBlob)
 		{
 			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+			// Replace dbgprint with your logging method
 			dbgprint("ShaderCompiler", "Error: %s\n", reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
 			pErrorBlob->Release();
 		}
@@ -175,7 +184,6 @@ HRESULT CompileShaderFromFile(const WCHAR* szFileName, LPCSTR szEntryPoint, LPCS
 
 	return S_OK;
 }
-
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
 //--------------------------------------------------------------------------------------
